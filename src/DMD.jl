@@ -1,4 +1,4 @@
-using .ControlProj1, LinearAlgebra
+using .ControlProj1, LinearAlgebra, TSVD
 
 function get_trajectory(A,B,x0,u0,Δt, steps)
     
@@ -19,7 +19,7 @@ function get_trajectory(A,B,x0,u0,Δt, steps)
 
 end
 
-function DMD_SVD(x_steps, u_steps)
+function DMD_SVD(;x_steps, u_steps, low_rank = false)
 
     X_k = x_steps[:,1:end-1]
     X_k1 = x_steps[:,2:end]
@@ -30,30 +30,38 @@ function DMD_SVD(x_steps, u_steps)
 
     Ω = vcat(X_k, Υ_k')
 
-    U,D,V = svd(Ω)
+    U,D,V = tsvd(Ω)
 
     D = Diagonal(D)
 
-    U1 = U[:,1:n]
-    U2 = U[:,n+1:end]
+    G_hat = X_k1 * V * inv(D) * U'
 
-    U_k1, D_k1, V_k1 = svd(X_k1)
+    A_hat = G_hat[:,1:n]
+    B_hat = G_hat[:,n+1:end]
 
-    A_hat = U_k1' * X_k1 * V * inv(D) * U1' * U_k1
-    B_hat = U_k1' * X_k1 * V * inv(D) * U2'
+    if low_rank == true
+
+        U_k1, D_k1, V_k1 = tsvd(X_k1)
+
+        A_hat = U_k1' * A_hat * U_k1
+        B_hat = U_k1' * B_hat
+
+        return A_hat, B_hat, U_k1
+
+    end
 
     return A_hat, B_hat
     
 end
 
-function error_rate(;x_steps, u_steps, A_hat, B_hat)
+function error_rate(;x_steps, u_steps, A_hat, B_hat, U = I)
 
     X_k = x_steps[:,1:end-1]
     X_k1 = x_steps[:,2:end]
 
     Υ_k = u_steps[1:end-1]
 
-    X_hat = A_hat * X_k + B_hat * Υ_k
+    X_hat = U * (A_hat * X_k + reduce(hcat,[B_hat .* u for u in Υ_k]))
 
     err = X_k1 - X_hat
 

@@ -2,3 +2,7 @@ name = "ControlProj1"
 uuid = "2f5a5029-1a9a-4d24-93f8-0f4a7668ef44"
 authors = ["Abhishek Devarajan <abhishekdevarajan@gmail.com>"]
 version = "0.1.0"
+
+[deps]
+LowRankApprox = "898213cb-b102-5a47-900c-97e73b919f73"
+TSVD = "9449cd9e-2762-5aa3-a617-5413e99d722e"
