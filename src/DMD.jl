@@ -19,6 +19,22 @@ function get_trajectory(A,B,x0,u0,Δt, steps)
 
 end
 
+function trajectory_prediction(;A_hat,B_hat, x_test, u_test, Δt, steps)
+
+    m = length(x_test)
+
+    x_pred = zeros(size(x_test))
+
+    for i in eachindex(x_test[1,:])
+
+        x_pred[:,i], _ = linsys(A = A_hat,B = B_hat,x = x_test[:,i],u = u_test[i],Δt=Δt, noise=false)
+
+    end
+
+    return x_pred
+    
+end
+
 function DMD_SVD(;x_steps, u_steps, low_rank = false)
 
     X_k = x_steps[:,1:end-1]
