@@ -1,0 +1,4 @@
+[deps]
+DataDrivenDiffEq = "2445eb08-9709-466a-b3fc-47e12bd697a2"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+RobustDMD = "c3605908-9f0f-11e8-0a72-0d361c15a277"

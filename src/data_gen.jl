@@ -1,10 +1,18 @@
 using Distributions, LinearAlgebra
 
-function linsys(A,B,x,u,Δt)
+function linsys(;A,B,x,u,Δt, noise=true)
 
-    x_next = (Δt .* A + I)*x + Δt .* B * u
+    if noise == true
 
-    u_next = copy(x_next)
+        x_next = (Δt .* A + I)*x + Δt .* B .* u + randn(size(x))
+
+    else
+
+        x_next = (Δt .* A + I)*x + Δt .* B .* u
+
+    end
+    
+    u_next = rand(Uniform(-3,3))
 
     return x_next, u_next
     
