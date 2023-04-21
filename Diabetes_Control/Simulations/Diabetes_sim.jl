@@ -4,9 +4,9 @@ using Plots
 #Initalizations
 
 ##system states
-Qsto1 = 0
-Qsto2 = 0
-Qgut = 0
+Qsto1 = 10
+Qsto2 = 20
+Qgut = 30
 Gp = 75.18
 Gt = 106.16
 Gs = 75.18
@@ -19,7 +19,8 @@ XL = 25.56
 Isc2 = 0
 
 dose = 1
-conta = 1
+conta = 0
+dosekempt = 50
 
 ##hyperparameters
 ###non-diabetic values
@@ -59,6 +60,16 @@ kd = 1.64e-2
 kgut = 3.78e-2
 BW = 150
 
+#PID parameters
+I_dir = 0.4 #units/kg/day Daily Insulin Requirement
+Kp = I_dir/135
+TI = 450 #150 (nighttime)
+TD = 90 #60 (nighttime)
+G_target = 90 #110 (nighttime)
+#K1 = 1.966308 #unused in reference code
+#K2 = 0.966584 #unused in reference code
+
+
 #Renal Extraction
 function renal_extraction(y)
     
@@ -82,6 +93,8 @@ function plasma_glucose(y,∂y,escr)
 
     ∂y[4] = max((kp1 - kp2*y[4]-kp3*y[12]),0) + max((kabs*y[3]*f/BW),0) - Fsnc - k1*y[4] + k2*y[5] - escr
     ∂y[5] = k1*y[4] - k2*y[5] - (Vm0 + Vmx*y[10])/(km0 + y[5])*y[5]
+
+    return ∂y
 
 end
 
@@ -107,6 +120,8 @@ function absorption(y,∂y)
     
     end
 
+    return ∂y
+
 end
 
 #Subcutaneous glucose kinetics
@@ -114,6 +129,32 @@ end
 function subcutaneous_glucose(y,∂y)
     
     ∂y[6] = -0.1*y[6] + 0.1*y[4]
+
+    return ∂y
+
+end
+
+#Plasma Insulin and PID
+
+function plasma_insulinPID(y,∂y)
+    P = Kp*(y[6]/Vg - G_target)
+    D = Kp*TD*∂y[6]/Vg
+    ∂y[13] = P/TI
+    PID = (P + D + y[13])/BW
+
+    if PID > 0
+
+        ∂y[7] = PID - (kd + ka1)*y[7]
+
+    else
+
+        ∂y[7] = -(kd + ka1)*y[7]
+
+    end
+
+    ∂y[14] = kd*y[7] - ka2*y[14]
+
+    return ∂y
 
 end
 
@@ -124,6 +165,8 @@ function plasma_insulin(y,∂y)
     ∂y[8] = -(m1 + m3)*y[8] + m2*y[9]
     ∂y[9] = m1*y[8] - (m2 + m4)*y[9] + ka1*y[7] + ka2*y[14]
 
+    return ∂y
+
 end
 
 #Insulin Action
@@ -131,6 +174,8 @@ end
 function insulin_action(y,∂y)
     
     ∂y[10] = -p2U*y[10] + p2U*(y[9]/Vi-25.56)
+
+    return ∂y
 
 end
 
@@ -141,11 +186,13 @@ function production(y,∂y)
     ∂y[11] = ki*(y[9]/Vi-y[11])
     ∂y[12] = ki*(y[11]-y[12])
 
+    return ∂y
+
 end
 
 #Run Simulation
 
-function run_sim(y,∂y, trials, Δt)
+function run_sim(y,∂y, trials, Δt; control = true)
 
     Gp_list = zeros(trials)
 
@@ -157,25 +204,34 @@ function run_sim(y,∂y, trials, Δt)
         Ip_list[i] = y[9]
 
         escr = renal_extraction(y)
-        plasma_glucose(y,∂y,escr)
-        absorption(y,∂y)
-        subcutaneous_glucose(y,∂y)
-        plasma_insulin(y,∂y)
-        insulin_action(y,∂y)
-        production(y,∂y)
+        ∂y = plasma_glucose(y,∂y,escr)
+        ∂y = absorption(y,∂y)
+        ∂y = subcutaneous_glucose(y,∂y)
+        
+        if control == true
+        
+            ∂y = plasma_insulinPID(y,∂y)
+        
+        end
+        
+        ∂y = plasma_insulin(y,∂y)
+        ∂y = insulin_action(y,∂y)
+        ∂y = production(y,∂y)
 
         y = Δt*∂y + y
         
     end
 
+    title_text = control == 1 ? "Controlled" : "Uncontrolled"
+
     plt1 = plot(Gp_list)
-    title!("Plasma Glucose Over k Iterations")
+    title!("$(title_text) Plasma Glucose Dynamics")
     xlabel!("k")
     ylabel!("Glucose (mg/kg)")
     display(plt1)
 
     plt2 = plot(Ip_list)
-    title!("Plasma Insulin Over k Iterations")
+    title!("$(title_text) Plasma Insulin Dynamics")
     xlabel!("k")
     ylabel!("Insulin (pmol/kg)")
     display(plt2)
@@ -189,7 +245,7 @@ function main()
     y = [Qsto1;Qsto2;Qgut;Gp;Gt;Gs;Isc1;Il;Ip;X;I_prime;XL;0;Isc2]
     ∂y = zeros(size(y))
 
-    y_end, ∂y_end = run_sim(y,∂y,500,1)
+    y_end, ∂y_end = run_sim(y,∂y,100000,1, control = false)
 
     println(y_end)
     println(∂y_end)
